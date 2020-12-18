@@ -5,9 +5,10 @@
 #include <cstring>
 #include <math.h>
 #include "BMP.h"
-
+    //bmp vars
     string fileName;
     int width, height, imgSize, bitDepth, offSet, rowSize;
+    int histogram[255];
     char imgHeader[BMP_HEADER_SIZE];
     char imgColorTable[BMP_COLOR_TABLE_SIZE];
     char* imgBuffer;
@@ -143,18 +144,15 @@
         for(int i = 0; i < imgSize; i++){
             imgBuffer[i] = (imgBuffer[i] < threshhold) ? WHITE : BLACK;
         }
-        // imageWriter("./imgBinarizeCopy.bmp");
     }
     void BMP::imageNegative(){
         int negVal;
-
         for(int i = 0; i < height; i++){
                 for(int j = 0; j < width; j++){
                     negVal = 255 - imgBuffer[i*width+j];
                     imgBuffer[i*width+j] = negVal;
             }
         }
-        // imageWriter("./imgNegativeCopy.bmp");
     }
     void BMP::imageRotate(int numRot){ 
     
@@ -162,17 +160,17 @@
 
             for(int i = 0; i < width; i++){
                 for(int j = 0; j < height; j++){
-                    tempBuffer[i * width - j] = imgBuffer[j * height + i]; //Rotates images 90 degrees to the left
-                    // tempBuffer[i * height + j] = imgBuffer[j * width + i]; //Rotates images 90 degrees to the right but doesnt recurse for some reason
+                    //Rotates images 90 degrees to the left
+                    tempBuffer[i * width + j ] = (unsigned char) imgBuffer[width * (height - 1 - j) + i];
+                    //Rotates images 90 degrees to the right 
                 }
             }
 
         memcpy(imgBuffer, tempBuffer, imgSize);
 
         if(numRot > 1){
-            imageRotate(numRot-1);
+            imageRotate(numRot - 1);
         } 
-        // imageWriter("./imgRotatedCopy.bmp");
     }
     void BMP::imageMirror(){
         
@@ -180,7 +178,7 @@
         
         for(int i = 0; i < width; i++){
             for(int j = 0; j < height; j++){
-                tempBuffer[height*j+i] = imgBuffer[width*j-i]; //Flips image on yaxis
+                tempBuffer[height*i+j] = (unsigned char)imgBuffer[height * (width - 1 - i) + j]; //Flips image on yaxis
                 }
             }
         memcpy(imgBuffer, tempBuffer, imgSize);
@@ -221,7 +219,6 @@
                 }
             }
         memcpy(imgBuffer, tempBuffer, imgSize);
-        // imageWriter("./imgLinesCopy.bmp");
     }   
     void BMP::laplaceConvolve(){
         int di, dj, img, val;
@@ -253,7 +250,7 @@
                 if(val>255) val = 255;
                 if(val<0) val = 0; 
 
-                tempBuffer[j + i*width] = (char)val;
+                tempBuffer[j + i*width] = (unsigned char)val;
                 
             }
         }
@@ -264,9 +261,9 @@
         const int KERNEL_SIZE = 3;
         float mask, img, val;
         
-        float blurKernel[9] = { 1/9.0,1/9.0,1/9.0,
-                                1/9.0,1/9.0,1/9.0,
-                                1/9.0,1/9.0,1/9.0
+        float blurKernel[9] = { 1/9.0, 1/9.0, 1/9.0, 
+                                1/9.0, 1/9.0, 1/9.0, 
+                                1/9.0, 1/9.0, 1/9.0
                             };
         
         char tempBuffer[imgSize];
@@ -278,30 +275,34 @@
                     for(int jj = 0; jj < KERNEL_SIZE; jj++){
                         di = i - ii;
                         dj = j - jj;
-                        if(di >= 0 && dj >= 0) // Buffer border pixels since we have no padding
-                            val += (float)blurKernel[ii * KERNEL_SIZE + jj]*imgBuffer[dj+di*width];
-                    }
+                        if(di >= 0 && dj >= 0 && di < width && dj < height) // Pad for border pixels
+                             val += blurKernel[jj* KERNEL_SIZE + ii]*(unsigned char)imgBuffer[dj+di*width];
+                        else
+                            val = imgBuffer[j+i*width];
+                    }      
                 }
-
-                tempBuffer[j + i*width] = (char)val;
+                    tempBuffer[j + i*width] = (unsigned char)val;
             }
         }
         memcpy(imgBuffer, tempBuffer, imgSize);
     }
     void BMP::imageHistogram(){
 
-        int colorInstance = 0;
-        int hist[255] = {0};
+        unsigned char colorInstance = 0;
         int sum = 0;
+        histogram[255] = {0};
         ofstream ofs;
 
         for(int i = 0; i < width; i++){
             for(int j = 0; j < height; j++){
-                colorInstance = imgBuffer[i+j*height];
-                if(colorInstance >= 0) hist[colorInstance] += 1;
+                colorInstance = (unsigned char)imgBuffer[i+j*height];
+                if(colorInstance >= 0) histogram[colorInstance] += 1;
+                else{
+                    cout << "foo" << endl;
+                }
             }
         }
-
+        // Printing data to file for analysis. Last value is always check sum
         ofs.open("image_histogram.txt", ios::out);
 
         if (!ofs.is_open()){
@@ -310,9 +311,9 @@
         }
         
         for(int i = 1; i < 255; i++){
-            if(hist[i] != 0){
-                 ofs << i << "," << hist[i] << endl;
-                 sum += hist[i];
+            if(histogram[i] != 0){
+                 ofs << histogram[i] << "\n";
+                 sum += histogram[i];
             }
         }
         ofs << sum;
@@ -320,26 +321,33 @@
         ofs.close();
     }
 
-    // void imageEquilizer(const char* name, BMP* pic){
-    //     long *hist;
-    //     long sum, histEqual[255];
-    //     BMP pic1;
-
-    //     BMPCopy(pic, &pic1);
-    //     hist = imageHistogram(&pic1);
-
-    //     for(int i = 0; i < 255; i++){
-    //         sum = 0;
-    //         for(int j = 0; j <= i; j++){
-    //             sum += hist[j];
-    //         }
-    //     histEqual[i] = (255 * sum + .5);
-    //     }
-    //     for(int x = 0; x < pic1.width; x++ ){
-    //         for(int y = 0; y < pic1.height; y++){
-    //                 pic1.imgBuffer[x+y*pic1.height] = histEqual[pic1.imgBuffer[x+y*pic->height]];
-    //         }
-    //     }
-    //     imageWriter(name, &pic1);
-    // }
+    void BMP::imageEquilizer(){
+   
+        char tempBuffer[imgSize];
+        float sum = 0;
+        float ehist[255];
+        //normalized cumulative sum of values in histogram
+        for(int i = 0; i < 255; i++){
+            sum += histogram[i];
+            ehist[i] = (float)(sum / imgSize); //normalize
+        }
+        // Map intensity value of pixel to CDF value and multiply it by max value 
+        for(int x = 0; x < width; x++ ){
+            for(int y = 0; y < height; y++){
+                    tempBuffer[x+y*height] = 255 * ehist[(unsigned char)imgBuffer[x+y*height]];
+            }
+        }
+    memcpy(imgBuffer, tempBuffer, imgSize);
+    }
+    void BMP::brightness(int brightness){
+       int val = 0;
+        for(int i = 0; i < height; i++){
+                for(int j = 0; j < width; j++){
+                    val = (unsigned char)imgBuffer[i*width+j] + brightness;
+                    if(val>255) val = 255;
+                    if(val<0) val = 0; 
+                    imgBuffer[i*width+j] = val; 
+            }
+        }
+    }
 

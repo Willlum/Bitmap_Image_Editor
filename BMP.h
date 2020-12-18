@@ -27,7 +27,6 @@ class BMP{
     void imageWriter(string& fileName);
     void displayCurrentState();
 
-    // void imageEquilizer(const char*, BMP*);
     void imageBinarize(int threshhold);
     void imageRotate(int imgRot);
     void imageMirror();
@@ -36,6 +35,8 @@ class BMP{
     void laplaceConvolve();
     void blurConvolve();
     void imageHistogram();
+    void imageEquilizer();
+    void brightness(int brightness);
     
     void operator= (const BMP& initPic);
 };
